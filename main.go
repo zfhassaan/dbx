@@ -5,14 +5,40 @@ import (
 	"dbx/internal/db"
 	"fmt"
 	"os"
+	"os/exec"
+	"runtime"
 	"strings"
 )
 
-func main() {
-	showMenu()
+type App struct {
+	reader *bufio.Reader
 }
 
-func showBanner() {
+func main() {
+	app := &App{
+		reader: bufio.NewReader(os.Stdin),
+	}
+	app.MainMenu()
+}
+
+// clearScreen clears the terminal screen using ANSI escape codes and flushes stdout.
+func (a *App) clearScreen() {
+	switch runtime.GOOS {
+	case "windows":
+		for i := 0; i < 40; i++ {
+			fmt.Println()
+		}
+		cmd := exec.Command("cmd", "/c", "cls")
+		cmd.Stdout = os.Stdout
+		cmd.Run()
+	default:
+		cmd := exec.Command("clear")
+		cmd.Stdout = os.Stdout
+		cmd.Run()
+	}
+}
+
+func (a *App) showBanner() {
 	fmt.Println(`
   ____  ____  __  __       
  |  _ \| __ )|  \/  | ___  
@@ -21,67 +47,108 @@ func showBanner() {
  |____/|____/|_|  |_|\___/  v0.0.1
 
    DBX — Dead-simple database backups.
- ----------------------------
-      Author: @zfhassaan
- ----------------------------`)
+   -----------------------------------
+      Author: @zfhassaan`)
 }
 
-func showMenu() {
-	showBanner()
+func (a *App) promptInput(prompt, defaultVal string, hideInput bool) string {
+	if defaultVal != "" {
+		fmt.Printf("%s [%s]: ", prompt, defaultVal)
+	} else {
+		fmt.Printf("%s: ", prompt)
+	}
+	if hideInput {
+		// For simplicity, we use normal input; for real password hiding, use a library.
+	}
+	input, _ := a.reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+	if input == "" && defaultVal != "" {
+		return defaultVal
+	}
+	return input
+}
 
-	fmt.Println("\nChoose an option:")
-	fmt.Println("[1] MySQL Backup")
-	fmt.Println("[0] Exit")
+func (a *App) MainMenu() {
+	a.clearScreen()
+	a.showBanner()
+	fmt.Println("===== DBX: Database Backup Utility =====")
+	fmt.Println("[1] 🔄 Backup Menu")
+	fmt.Println("[2] 🔁 Restore Menu")
+	fmt.Println("[3] 📜 View Logs")
+	fmt.Println("[0] ❌ Exit")
+	fmt.Print("Enter your choice: ")
 
-	fmt.Print("\nEnter choice: ")
-	var choice int
-	fmt.Scanln(&choice)
-
+	choice := a.readInt()
 	switch choice {
 	case 1:
-		runMySQLBackup()
+		a.BackupMenu()
+	case 2:
+		a.RestoreMenu()
+	case 3:
+		a.ViewLogs()
 	case 0:
-		fmt.Println("Exiting DBX.")
+		fmt.Println("👋 Exiting DBX.")
 		os.Exit(0)
 	default:
-		fmt.Println("Invalid option.\n")
-		showMenu()
+		fmt.Println("⚠️ Invalid option. Try again.")
+		a.MainMenu()
 	}
 }
 
-func runMySQLBackup() {
-	reader := bufio.NewReader(os.Stdin)
+func (a *App) BackupMenu() {
+	a.clearScreen()
+	a.showBanner()
+	fmt.Println("--- MySQL Backup Menu ---")
+	fmt.Println("[1] Run MySQL Backup")
+	fmt.Println("[0] Back to Main Menu")
+	fmt.Print("Enter your choice: ")
 
-	fmt.Print("MySQL Host [localhost]: ")
-	host, _ := reader.ReadString('\n')
-	if host == "\n" {
-		host = "localhost"
+	choice := a.readInt()
+	switch choice {
+	case 1:
+		a.RunMySQLBackup()
+	case 0:
+		a.MainMenu()
+	default:
+		fmt.Println("Invalid choice.")
+		a.BackupMenu()
 	}
+}
 
-	fmt.Print("MySQL User [root]: ")
-	user, _ := reader.ReadString('\n')
-	if user == "\n" {
-		user = "root"
+func (a *App) RestoreMenu() {
+	a.clearScreen()
+	a.showBanner()
+	fmt.Println("--- Restore Menu (Coming Soon) ---")
+	fmt.Println("[0] Back to Main Menu")
+	choice := a.readInt()
+	if choice == 0 {
+		a.MainMenu()
+	} else {
+		a.RestoreMenu()
 	}
+}
 
-	fmt.Print("MySQL Password: ")
-	pass, _ := reader.ReadString('\n')
-
-	fmt.Print("Database Name: ")
-	dbname, _ := reader.ReadString('\n')
-
-	fmt.Print("Backup Directory [./backups]: ")
-	out, _ := reader.ReadString('\n')
-	if out == "\n" {
-		out = "./backups"
+func (a *App) ViewLogs() {
+	a.clearScreen()
+	a.showBanner()
+	fmt.Println("--- Backup Logs (Coming Soon) ---")
+	fmt.Println("[0] Back to Main Menu")
+	choice := a.readInt()
+	if choice == 0 {
+		a.MainMenu()
+	} else {
+		a.ViewLogs()
 	}
+}
 
-	// Trim newline characters
-	host = trim(host)
-	user = trim(user)
-	pass = trim(pass)
-	dbname = trim(dbname)
-	out = trim(out)
+func (a *App) RunMySQLBackup() {
+	a.clearScreen()
+	a.showBanner()
+	host := a.promptInput("MySQL Host", "localhost", false)
+	user := a.promptInput("MySQL User", "root", false)
+	pass := a.promptInput("MySQL Password", "", false)
+	dbname := a.promptInput("Database Name", "", false)
+	out := a.promptInput("Backup Directory", "./backups", false)
 
 	err := db.BackupMySQL(host, user, pass, dbname, out)
 	if err != nil {
@@ -90,11 +157,21 @@ func runMySQLBackup() {
 		fmt.Println("\n✅ Backup successful!")
 	}
 
-	fmt.Print("\nPress ENTER to return to menu...")
-	reader.ReadString('\n')
-	showMenu()
+	fmt.Print("\nPress ENTER to return to Backup Menu...")
+	a.reader.ReadString('\n')
+	a.BackupMenu()
 }
 
-func trim(s string) string {
-	return strings.TrimSpace(s)
+func (a *App) readInt() int {
+	var choice int
+	for {
+		_, err := fmt.Fscanln(a.reader, &choice)
+		if err == nil {
+			break
+		}
+		// If input is not an int, clear the buffer and prompt again
+		a.reader.ReadString('\n')
+		fmt.Print("Please enter a valid number: ")
+	}
+	return choice
 }
