@@ -7,6 +7,8 @@ import (
 /*
 rootCmd defines the main Cobra command for the dbx CLI, providing database backup and restore functionality.
 Execute runs the root command and handles any execution errors.
+
+	Long:  "Cross-platform tool to backup and restore databases like MySQL, PostgreSQL, and SQLite",
 */
 var rootCmd = &cobra.Command{
 	Use:   "dbx",
