@@ -48,7 +48,8 @@ func (a *App) showBanner() {
 
    DBX — Dead-simple database backups.
    -----------------------------------
-      Author: @zfhassaan`)
+      Author: @zfhassaan
+   ----------------------------------`)
 }
 
 func (a *App) promptInput(prompt, defaultVal string, hideInput bool) string {
@@ -75,7 +76,7 @@ func (a *App) MainMenu() {
 	fmt.Println("[1] 🔄 Backup Menu")
 	fmt.Println("[2] 🔁 Restore Menu")
 	fmt.Println("[3] 📜 View Logs")
-	fmt.Println("[0] ❌ Exit")
+	fmt.Println("[0] ❌  Exit")
 	fmt.Print("Enter your choice: ")
 
 	choice := a.readInt()
