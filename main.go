@@ -30,11 +30,17 @@ func (a *App) clearScreen() {
 		}
 		cmd := exec.Command("cmd", "/c", "cls")
 		cmd.Stdout = os.Stdout
-		cmd.Run()
+		err := cmd.Run()
+		if err != nil {
+			return
+		}
 	default:
 		cmd := exec.Command("clear")
 		cmd.Stdout = os.Stdout
-		cmd.Run()
+		err := cmd.Run()
+		if err != nil {
+			return
+		}
 	}
 }
 
@@ -46,10 +52,10 @@ func (a *App) showBanner() {
  | |_| | |_) | |  | | (_) |
  |____/|____/|_|  |_|\___/  v0.0.1
 
-   DBX — Dead-simple database backups.
-   -----------------------------------
-      Author: @zfhassaan
-   ----------------------------------`)
+ DBX — Dead-simple database backups.
+ -----------------------------------
+    Author: @zfhassaan
+ ----------------------------------`)
 }
 
 func (a *App) promptInput(prompt, defaultVal string, hideInput bool) string {
@@ -159,7 +165,10 @@ func (a *App) RunMySQLBackup() {
 	}
 
 	fmt.Print("\nPress ENTER to return to Backup Menu...")
-	a.reader.ReadString('\n')
+	_, err = a.reader.ReadString('\n')
+	if err != nil {
+		return
+	}
 	a.BackupMenu()
 }
 
@@ -171,7 +180,10 @@ func (a *App) readInt() int {
 			break
 		}
 		// If input is not an int, clear the buffer and prompt again
-		a.reader.ReadString('\n')
+		_, err = a.reader.ReadString('\n')
+		if err != nil {
+			return 0
+		}
 		fmt.Print("Please enter a valid number: ")
 	}
 	return choice

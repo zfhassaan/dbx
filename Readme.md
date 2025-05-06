@@ -68,9 +68,9 @@ dbx/
 ## ⚙️ Installation
 
 ```bash
-git clone https://github.com/yourname/dbbackupcli.git
-cd dbbackupcli
-go build -o dbbackup
+git clone https://github.com/zfhassaan/dbx.git
+cd dbx
+go build -o dbx
 ````
 
 ---
