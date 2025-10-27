@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"dbx/cmd"
 	"dbx/internal/db"
 	"fmt"
 	"os"
@@ -86,6 +87,7 @@ func (a *App) MainMenu() {
 	fmt.Print("Enter your choice: ")
 
 	choice := a.readInt()
+
 	switch choice {
 	case 1:
 		a.BackupMenu()
@@ -107,6 +109,8 @@ func (a *App) BackupMenu() {
 	a.showBanner()
 	fmt.Println("--- MySQL Backup Menu ---")
 	fmt.Println("[1] Run MySQL Backup")
+	fmt.Println("[2] Run MongoDB Backup")
+	fmt.Println("[3] Run PostgreSQL Backup")
 	fmt.Println("[0] Back to Main Menu")
 	fmt.Print("Enter your choice: ")
 
@@ -114,6 +118,10 @@ func (a *App) BackupMenu() {
 	switch choice {
 	case 1:
 		a.RunMySQLBackup()
+	case 2:
+		a.RunMongoBackup()
+	case 3:
+		a.RunPostgresBackup()
 	case 0:
 		a.MainMenu()
 	default:
@@ -132,6 +140,16 @@ func (a *App) RestoreMenu() {
 		a.MainMenu()
 	} else {
 		a.RestoreMenu()
+	}
+}
+
+func (a *App) RunMongoBackup() {
+	a.clearScreen()
+	a.showBanner()
+	cmd.RunMongoBackup()
+	fmt.Print("\nPress ENTER to return to Backup Menu...")
+	if _, err := a.reader.ReadString('\n'); err == nil {
+		a.BackupMenu()
 	}
 }
 
@@ -187,4 +205,28 @@ func (a *App) readInt() int {
 		fmt.Print("Please enter a valid number: ")
 	}
 	return choice
+}
+
+func (a *App) RunPostgresBackup() {
+	a.clearScreen()
+	a.showBanner()
+	host := a.promptInput("PostgreSQL Host", "localhost", false)
+	port := a.promptInput("PostgreSQL Port", "5432", false)
+	user := a.promptInput("PostgreSQL User", "postgres", false)
+	pass := a.promptInput("PostgreSQL Password", "", false)
+	dbname := a.promptInput("Database Name", "", false)
+	out := a.promptInput("Backup Directory", "./backups", false)
+
+	err := db.BackupPostgres(host, port, user, pass, dbname, out)
+	if err != nil {
+		fmt.Println("\n❌ Backup failed:", err)
+	} else {
+		fmt.Println("\n✅ Backup successful!")
+	}
+	fmt.Print("\nPress ENTER to return to Backup Menu...")
+	_, err = a.reader.ReadString('\n')
+	if err != nil {
+		return
+	}
+	a.BackupMenu()
 }
