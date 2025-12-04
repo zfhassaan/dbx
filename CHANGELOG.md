@@ -38,3 +38,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.1.0]: https://github.com/zfhassaan/dbx/releases/tag/v0.1.0
 
+## [0.2.0] - 2024-12-XX
+
+### Security
+- **Fixed MySQL Password Security**: Changed from command-line password passing to `MYSQL_PWD` environment variable for secure credential handling
+- Passwords are no longer visible in process list
+
+### Added
+- **CLI Cloud Upload**: Added `--upload` flag to all backup commands (mysql, postgres, mongo, sqlite)
+- **Cloud Provider Selection**: Support for selecting cloud provider via `--cloud` flag (s3, gcs, azure)
+- **Scheduled Backup Cloud Upload**: Automatic cloud upload support for scheduled backups
+- **Backup Verification**: Added backup file verification with size reporting and checksum calculation utilities
+- **Selective Restore Validation**: Enhanced validation for table/collection restore operations
+- **Progress Indicators**: Added status messages and progress feedback for long-running operations
+
+### Improved
+- **PostgreSQL Incremental Backups**: Added comprehensive documentation and warnings about WAL archiving requirements
+- **Error Messages**: Enhanced error messages for restore operations with better validation feedback
+- **MySQL Table Restore**: Improved table extraction logic with better pattern matching
+
+### Technical
+- Created `internal/utils/verify.go` for backup verification utilities
+- Created `internal/utils/progress.go` for progress indication
+- Enhanced scheduler with cloud upload integration
+- Improved security across all database operations
+
+### Breaking Changes
+None. All changes are backward compatible.
+
+[0.2.0]: https://github.com/zfhassaan/dbx/releases/tag/v0.2.0
+
