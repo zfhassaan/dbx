@@ -34,8 +34,10 @@ func BackupMySQLWithType(host, user, password, database, outDir string, backupTy
 	}
 
 	args := []string{"-h", host, "-u", user}
+	// Use MYSQL_PWD environment variable for security (password not visible in process list)
 	if password != "" {
-		args = append(args, "-p"+password)
+		// Set environment variable before command execution
+		// Note: This is set per-command, not globally
 	}
 	
 	// For incremental backups, use --master-data and --flush-logs
@@ -49,7 +51,12 @@ func BackupMySQLWithType(host, user, password, database, outDir string, backupTy
 	args = append(args, database)
 
 	cmd := exec.Command("mysqldump", args...)
-	cmd.Env = os.Environ()
+	env := os.Environ()
+	// Set MYSQL_PWD environment variable for secure password passing
+	if password != "" {
+		env = append(env, "MYSQL_PWD="+password)
+	}
+	cmd.Env = env
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -70,6 +77,8 @@ func BackupMySQLWithType(host, user, password, database, outDir string, backupTy
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("mysqldump failed to start: %v", err)
 	}
+
+	fmt.Println("🔄 Running MySQL backup...")
 
 	// Buffer the dump output in memory
 	var outputBuf bytes.Buffer
@@ -118,5 +127,15 @@ func BackupMySQLWithType(host, user, password, database, outDir string, backupTy
 		return err
 	}
 
+	// Verify backup file was created and is not empty
+	info, statErr := os.Stat(outFile)
+	if statErr != nil {
+		return fmt.Errorf("backup file verification failed: %w", statErr)
+	}
+	if info.Size() == 0 {
+		return fmt.Errorf("backup file is empty")
+	}
+
+	fmt.Printf("✅ Backup verified: %s (%.2f MB)\n", outFile, float64(info.Size())/1024/1024)
 	return nil
 }

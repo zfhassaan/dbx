@@ -55,10 +55,20 @@ func BackupPostgresWithType(host, port, user, pass, dbName, outDir string, backu
 		"-f", outFile,
 	}
 
-	// For incremental backups, use WAL-based approach
-	// Note: True incremental requires continuous archiving setup in PostgreSQL
-	// Currently only adds verbose flag; full incremental backup requires WAL archiving configuration
+	// For incremental/differential backups in PostgreSQL:
+	// WARNING: PostgreSQL does not natively support incremental/differential backups via pg_dump.
+	// True incremental backups require WAL (Write-Ahead Log) archiving to be configured.
+	// This implementation performs a full backup but marks it as incremental/differential.
+	// For true incremental backups, you need to:
+	// 1. Enable WAL archiving in postgresql.conf: wal_level = replica, archive_mode = on
+	// 2. Configure archive_command to copy WAL files
+	// 3. Use pg_basebackup with WAL streaming for true incremental backups
+	// 
+	// This function will perform a full backup regardless of backupType for PostgreSQL.
+	// Consider using metadata tracking to implement differential backups based on file timestamps.
 	if backupType == BackupTypeIncremental || backupType == BackupTypeDifferential {
+		fmt.Println("⚠️  WARNING: PostgreSQL incremental/differential backups require WAL archiving setup.")
+		fmt.Println("   This backup will be a full backup. For true incremental backups, configure WAL archiving.")
 		args = append(args, "--verbose")
 	}
 

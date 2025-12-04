@@ -49,11 +49,41 @@ var scheduleAddCmd = &cobra.Command{
 			return fmt.Errorf("unsupported database type: %s", dbType)
 		}
 
+		// Add cloud upload parameters if requested
+		if uploadCloud {
+			params["upload_cloud"] = "true"
+			params["cloud_provider"] = cloudProvider
+			if s3Bucket != "" {
+				params["s3_bucket"] = s3Bucket
+			}
+			if s3Prefix != "" {
+				params["s3_prefix"] = s3Prefix
+			}
+			if gcsBucket != "" {
+				params["gcs_bucket"] = gcsBucket
+			}
+			if gcsPrefix != "" {
+				params["gcs_prefix"] = gcsPrefix
+			}
+			if azureAccount != "" {
+				params["azure_account"] = azureAccount
+			}
+			if azureContainer != "" {
+				params["azure_container"] = azureContainer
+			}
+			if azureBlob != "" {
+				params["azure_blob"] = azureBlob
+			}
+		}
+
 		if err := scheduler.AddJob(dbType, scheduleCron, params); err != nil {
 			fmt.Println("Failed to schedule backup:", err)
 			os.Exit(1)
 		}
 		fmt.Println("✅ Backup scheduled successfully")
+		if uploadCloud {
+			fmt.Println("☁️  Cloud upload enabled for this schedule")
+		}
 		return nil
 	},
 }
@@ -97,8 +127,18 @@ func init() {
 	scheduleAddCmd.Flags().StringVar(&sqlitePath, "path", "", "SQLite database path")
 	scheduleAddCmd.Flags().StringVar(&out, "out", "./backups", "Output directory")
 	scheduleAddCmd.Flags().StringVar(&scheduleCron, "cron", "", "Cron schedule (e.g., '0 2 * * *' for daily at 2 AM)")
+	
+	// Cloud upload flags for scheduled backups
+	scheduleAddCmd.Flags().BoolVar(&uploadCloud, "upload", false, "Upload backups to cloud storage automatically")
+	scheduleAddCmd.Flags().StringVar(&cloudProvider, "cloud", "s3", "Cloud provider: s3, gcs, or azure")
+	scheduleAddCmd.Flags().StringVar(&s3Bucket, "s3-bucket", "", "S3 bucket name (or set DBX_S3_BUCKET env var)")
+	scheduleAddCmd.Flags().StringVar(&s3Prefix, "s3-prefix", "dbx/", "S3 prefix/folder path")
+	scheduleAddCmd.Flags().StringVar(&gcsBucket, "gcs-bucket", "", "GCS bucket name")
+	scheduleAddCmd.Flags().StringVar(&gcsPrefix, "gcs-prefix", "dbx/", "GCS prefix/folder path")
+	scheduleAddCmd.Flags().StringVar(&azureAccount, "azure-account", "", "Azure storage account name")
+	scheduleAddCmd.Flags().StringVar(&azureContainer, "azure-container", "", "Azure container name")
+	scheduleAddCmd.Flags().StringVar(&azureBlob, "azure-blob", "", "Azure blob name (optional)")
 
 	scheduleAddCmd.MarkFlagRequired("db")
 	scheduleAddCmd.MarkFlagRequired("cron")
-}
 

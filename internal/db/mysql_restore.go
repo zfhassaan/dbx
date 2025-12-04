@@ -25,9 +25,14 @@ func RestoreMySQL(host, user, pass, dbName, backupFile string) error {
 	cmd := exec.Command("mysql",
 		"-h", host,
 		"-u", user,
-		"-p"+pass,
 		dbName,
 	)
+	// Use MYSQL_PWD environment variable for security
+	env := os.Environ()
+	if pass != "" {
+		env = append(env, "MYSQL_PWD="+pass)
+	}
+	cmd.Env = env
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 
 	// Pipe backup file into mysql command
@@ -65,6 +70,11 @@ func RestoreMySQLTable(host, user, pass, dbName, backupFile, tableName string) e
 
 	fmt.Printf("🔄 Restoring MySQL table '%s'...\n", tableName)
 
+	// Verify backup file exists before attempting restore
+	if _, err := os.Stat(backupFile); err != nil {
+		return fmt.Errorf("backup file not found: %w", err)
+	}
+
 	// Extract table data from dump file
 	file, err := os.Open(backupFile)
 	if err != nil {
@@ -75,12 +85,17 @@ func RestoreMySQLTable(host, user, pass, dbName, backupFile, tableName string) e
 	scanner := bufio.NewScanner(file)
 	var tableData strings.Builder
 	inTable := false
+	tableFound := false
 
 	for scanner.Scan() {
 		line := scanner.Text()
+		// Check for CREATE TABLE statement with the table name
 		if strings.Contains(line, fmt.Sprintf("CREATE TABLE `%s`", tableName)) ||
-			strings.Contains(line, fmt.Sprintf("CREATE TABLE %s", tableName)) {
+			strings.Contains(line, fmt.Sprintf("CREATE TABLE %s", tableName)) ||
+			strings.Contains(line, fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s`", tableName)) ||
+			strings.Contains(line, fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s", tableName)) {
 			inTable = true
+			tableFound = true
 			tableData.WriteString(line + "\n")
 		} else if inTable {
 			tableData.WriteString(line + "\n")
@@ -94,16 +109,21 @@ func RestoreMySQLTable(host, user, pass, dbName, backupFile, tableName string) e
 		}
 	}
 
-	if tableData.Len() == 0 {
-		return fmt.Errorf("table '%s' not found in backup file", tableName)
+	if !tableFound || tableData.Len() == 0 {
+		return fmt.Errorf("table '%s' not found in backup file. Please verify the table name and backup file contents", tableName)
 	}
 
 	cmd := exec.Command("mysql",
 		"-h", host,
 		"-u", user,
-		"-p"+pass,
 		dbName,
 	)
+	// Use MYSQL_PWD environment variable for security
+	env := os.Environ()
+	if pass != "" {
+		env = append(env, "MYSQL_PWD="+pass)
+	}
+	cmd.Env = env
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	cmd.Stdin = strings.NewReader(tableData.String())
 
