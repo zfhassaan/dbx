@@ -2,7 +2,7 @@
 
 A cross-platform CLI tool to backup and restore multiple database systems (MySQL, PostgreSQL, MongoDB, SQLite). Supports automatic scheduling, compression, cloud storage uploads (AWS S3, GCS, Azure Blob Storage), and detailed logging.
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/zfhassaan/dbx/releases/tag/v0.1.0)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/zfhassaan/dbx/releases/tag/v0.2.0)
 [![Go Version](https://img.shields.io/badge/go-1.24+-00ADD8.svg)](https://golang.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -545,6 +545,6 @@ Built by [zfhassaan](https://github.com/zfhassaan) — PRs welcome!
 
 ## Version
 
-Current version: **v0.1.0**
+Current version: **v0.2.0**
 
 For version history, see [CHANGELOG.md](CHANGELOG.md).
