@@ -2,6 +2,7 @@ package db
 
 import (
 	"bytes"
+	"dbx/internal/logs"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,8 @@ import (
 )
 
 func BackupMySQL(host, user, password, database, outDir string) error {
+	start := time.Now()
+
 	ts := time.Now().Format("2006-01-02_15-04")
 	outFile := filepath.Join(outDir, fmt.Sprintf("%s-%s.sql", database, ts))
 
@@ -63,7 +66,15 @@ func BackupMySQL(host, user, password, database, outDir string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
+
+	defer func() {
+		status := "SUCCESS"
+		if err != nil {
+			status = "FAILED"
+		}
+		logs.LogEntry("MySQL", "Backup", status, start, err)
+	}()
 
 	if _, err := outputBuf.WriteTo(file); err != nil {
 		return err

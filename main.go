@@ -3,7 +3,9 @@ package main
 import (
 	"bufio"
 	"dbx/cmd"
+	"dbx/internal/cloud"
 	"dbx/internal/db"
+	"dbx/internal/scheduler"
 	"fmt"
 	"os"
 	"os/exec"
@@ -77,12 +79,16 @@ func (a *App) promptInput(prompt, defaultVal string, hideInput bool) string {
 }
 
 func (a *App) MainMenu() {
+	scheduler.Init()
 	a.clearScreen()
 	a.showBanner()
 	fmt.Println("===== DBX: Database Backup Utility =====")
 	fmt.Println("[1] 🔄 Backup Menu")
 	fmt.Println("[2] 🔁 Restore Menu")
 	fmt.Println("[3] 📜 View Logs")
+	fmt.Println("[4] 🧩 Test Database Connection")
+	fmt.Println("[5] 🕒 Schedule Backups")
+	fmt.Println("[6] ☁️ Cloud Storage Help")
 	fmt.Println("[0] ❌  Exit")
 	fmt.Print("Enter your choice: ")
 
@@ -95,6 +101,10 @@ func (a *App) MainMenu() {
 		a.RestoreMenu()
 	case 3:
 		a.ViewLogs()
+	case 4:
+		a.TestConnectionMenu()
+	case 5:
+		a.ScheduleMenu()
 	case 0:
 		fmt.Println("👋 Exiting DBX.")
 		os.Exit(0)
@@ -102,6 +112,48 @@ func (a *App) MainMenu() {
 		fmt.Println("⚠️ Invalid option. Try again.")
 		a.MainMenu()
 	}
+}
+
+func (a *App) TestConnectionMenu() {
+	a.clearScreen()
+	a.showBanner()
+	fmt.Println("--- Test Database Connection ---")
+	fmt.Println("[1] MySQL")
+	fmt.Println("[2] PostgreSQL")
+	fmt.Println("[3] MongoDB")
+	fmt.Println("[4] SQLite")
+	fmt.Println("[0] Back to Main Menu")
+	fmt.Print("Choose database: ")
+
+	switch a.readInt() {
+	case 1:
+		a.TestMySQLConnection()
+	case 2:
+		a.TestPostgresConnection()
+	case 3:
+		a.TestMongoConnection()
+	case 4:
+		a.TestSQLiteConnection()
+	case 0:
+		a.MainMenu()
+	default:
+		fmt.Println("Invalid choice.")
+		a.TestConnectionMenu()
+	}
+}
+
+func (a *App) CloudHelp() {
+	a.clearScreen()
+	a.showBanner()
+	fmt.Println("--- Cloud Storage Setup ---")
+	fmt.Println("1️⃣ Install AWS CLI: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html")
+	fmt.Println("2️⃣ Run: aws configure")
+	fmt.Println("   Enter your Access Key, Secret, and Region.")
+	fmt.Println("3️⃣ DBX will use your default AWS profile automatically.")
+	fmt.Println("\n✅ Tip: You can set env vars DBX_S3_BUCKET & DBX_S3_PREFIX for auto-upload.")
+	fmt.Print("\nPress ENTER to return...")
+	defer func() { _, _ = a.reader.ReadString('\n') }()
+	a.MainMenu()
 }
 
 func (a *App) BackupMenu() {
@@ -130,15 +182,37 @@ func (a *App) BackupMenu() {
 	}
 }
 
+//func (a *App) RestoreMenu() {
+//	a.clearScreen()
+//	a.showBanner()
+//	fmt.Println("--- Restore Menu (Coming Soon) ---")
+//	fmt.Println("[0] Back to Main Menu")
+//	choice := a.readInt()
+//	if choice == 0 {
+//		a.MainMenu()
+//	} else {
+//		a.RestoreMenu()
+//	}
+//}
+
 func (a *App) RestoreMenu() {
 	a.clearScreen()
 	a.showBanner()
-	fmt.Println("--- Restore Menu (Coming Soon) ---")
+	fmt.Println("--- Restore Menu ---")
+	fmt.Println("[1] Restore MySQL Backup")
+	fmt.Println("[2] Restore MongoDB Backup")
 	fmt.Println("[0] Back to Main Menu")
-	choice := a.readInt()
-	if choice == 0 {
+	fmt.Print("Enter your choice: ")
+
+	switch a.readInt() {
+	case 1:
+		a.RunMySQLRestore()
+	case 2:
+		a.RunMongoRestore()
+	case 0:
 		a.MainMenu()
-	} else {
+	default:
+		fmt.Println("Invalid choice.")
 		a.RestoreMenu()
 	}
 }
@@ -147,23 +221,53 @@ func (a *App) RunMongoBackup() {
 	a.clearScreen()
 	a.showBanner()
 	cmd.RunMongoBackup()
+
+	upload := a.promptInput("Upload to AWS S3? (y/N)", "N", false)
+	if strings.ToLower(upload) == "y" {
+		bucket := a.promptInput("S3 Bucket Name", "my-db-backups", false)
+		prefix := a.promptInput("S3 Prefix (folder path)", "dbx/", false)
+		if err := cloud.UploadToS3(out+".zip", bucket, prefix); err != nil {
+			fmt.Println("❌ Upload failed:", err)
+		} else {
+			fmt.Println("☁️  Backup uploaded to S3 successfully!")
+		}
+	}
+
 	fmt.Print("\nPress ENTER to return to Backup Menu...")
 	if _, err := a.reader.ReadString('\n'); err == nil {
 		a.BackupMenu()
 	}
 }
 
+//func (a *App) ViewLogs() {
+//	a.clearScreen()
+//	a.showBanner()
+//	fmt.Println("--- Backup Logs (Coming Soon) ---")
+//	fmt.Println("[0] Back to Main Menu")
+//	choice := a.readInt()
+//	if choice == 0 {
+//		a.MainMenu()
+//	} else {
+//		a.ViewLogs()
+//	}
+//}
+
 func (a *App) ViewLogs() {
 	a.clearScreen()
 	a.showBanner()
-	fmt.Println("--- Backup Logs (Coming Soon) ---")
-	fmt.Println("[0] Back to Main Menu")
-	choice := a.readInt()
-	if choice == 0 {
-		a.MainMenu()
+	logFile := "./logs/dbx.log"
+
+	data, err := os.ReadFile(logFile)
+	if err != nil {
+		fmt.Println("⚠️ No logs found.")
 	} else {
-		a.ViewLogs()
+		fmt.Println("--- Backup & Restore Logs ---")
+		fmt.Println(string(data))
 	}
+
+	fmt.Print("\nPress ENTER to return to Main Menu...")
+	a.reader.ReadString('\n')
+	a.MainMenu()
 }
 
 func (a *App) RunMySQLBackup() {
@@ -180,6 +284,17 @@ func (a *App) RunMySQLBackup() {
 		fmt.Println("\n❌ Backup failed:", err)
 	} else {
 		fmt.Println("\n✅ Backup successful!")
+	}
+
+	upload := a.promptInput("Upload to AWS S3? (y/N)", "N", false)
+	if strings.ToLower(upload) == "y" {
+		bucket := a.promptInput("S3 Bucket Name", "my-db-backups", false)
+		prefix := a.promptInput("S3 Prefix (folder path)", "dbx/", false)
+		if err := cloud.UploadToS3(out+".zip", bucket, prefix); err != nil {
+			fmt.Println("❌ Upload failed:", err)
+		} else {
+			fmt.Println("☁️  Backup uploaded to S3 successfully!")
+		}
 	}
 
 	fmt.Print("\nPress ENTER to return to Backup Menu...")
@@ -223,10 +338,235 @@ func (a *App) RunPostgresBackup() {
 	} else {
 		fmt.Println("\n✅ Backup successful!")
 	}
+
+	upload := a.promptInput("Upload to AWS S3? (y/N)", "N", false)
+	if strings.ToLower(upload) == "y" {
+		bucket := a.promptInput("S3 Bucket Name", "my-db-backups", false)
+		prefix := a.promptInput("S3 Prefix (folder path)", "dbx/", false)
+		if err := cloud.UploadToS3(out+".zip", bucket, prefix); err != nil {
+			fmt.Println("❌ Upload failed:", err)
+		} else {
+			fmt.Println("☁️  Backup uploaded to S3 successfully!")
+		}
+	}
+
 	fmt.Print("\nPress ENTER to return to Backup Menu...")
 	_, err = a.reader.ReadString('\n')
 	if err != nil {
 		return
 	}
 	a.BackupMenu()
+}
+
+func (a *App) RunMySQLRestore() {
+	a.clearScreen()
+	a.showBanner()
+	host := a.promptInput("MySQL Host", "localhost", false)
+	user := a.promptInput("MySQL User", "root", false)
+	pass := a.promptInput("MySQL Password", "", false)
+	dbname := a.promptInput("Database Name", "", false)
+	file := a.promptInput("Path to .sql backup file", "./backups/backup.sql", false)
+
+	if err := db.RestoreMySQL(host, user, pass, dbname, file); err != nil {
+		fmt.Println("\n❌ Restore failed:", err)
+	} else {
+		fmt.Println("\n✅ Restore successful!")
+	}
+
+	fmt.Print("\nPress ENTER to return to Restore Menu...")
+	a.reader.ReadString('\n')
+	a.RestoreMenu()
+}
+
+func (a *App) RunMongoRestore() {
+	a.clearScreen()
+	a.showBanner()
+	uri := a.promptInput("MongoDB URI", "mongodb://localhost:27017", false)
+	dbname := a.promptInput("Database Name", "", false)
+	backupDir := a.promptInput("Path to backup folder", "./backups/dbname_timestamp", false)
+
+	if err := db.RestoreMongo(uri, dbname, backupDir); err != nil {
+		fmt.Println("\n❌ Restore failed:", err)
+	} else {
+		fmt.Println("\n✅ Restore successful!")
+	}
+
+	fmt.Print("\nPress ENTER to return to Restore Menu...")
+	a.reader.ReadString('\n')
+	a.RestoreMenu()
+}
+
+func (a *App) TestMySQLConnection() {
+	a.clearScreen()
+	a.showBanner()
+	host := a.promptInput("MySQL Host", "localhost", false)
+	user := a.promptInput("MySQL User", "root", false)
+	pass := a.promptInput("MySQL Password", "", false)
+	dbname := a.promptInput("Database Name", "", false)
+
+	params := map[string]string{"host": host, "user": user, "pass": pass, "dbname": dbname}
+	if err := db.TestConnection("mysql", params); err != nil {
+		fmt.Println("❌ Connection failed:", err)
+	} else {
+		fmt.Println("✅ Connection successful!")
+	}
+	fmt.Print("\nPress ENTER to return...")
+	_, err := a.reader.ReadString('\n')
+	if err != nil {
+		fmt.Println("Error in Connection", err)
+		return
+	}
+	a.TestConnectionMenu()
+}
+
+func (a *App) TestPostgresConnection() {
+	a.clearScreen()
+	a.showBanner()
+	host := a.promptInput("PostgreSQL Host", "localhost", false)
+	port := a.promptInput("PostgreSQL Port", "5432", false)
+	user := a.promptInput("PostgreSQL User", "postgres", false)
+	pass := a.promptInput("PostgreSQL Password", "", false)
+	dbname := a.promptInput("Database Name", "", false)
+
+	params := map[string]string{"host": host, "port": port, "user": user, "pass": pass, "dbname": dbname}
+	if err := db.TestConnection("postgres", params); err != nil {
+		fmt.Println("❌ Connection failed:", err)
+	} else {
+		fmt.Println("✅ Connection successful!")
+	}
+	fmt.Print("\nPress ENTER to return...")
+	_, err := a.reader.ReadString('\n')
+	if err != nil {
+		return
+	}
+	a.TestConnectionMenu()
+}
+
+func (a *App) TestMongoConnection() {
+	a.clearScreen()
+	a.showBanner()
+	uri := a.promptInput("MongoDB URI", "mongodb://localhost:27017", false)
+
+	params := map[string]string{"uri": uri}
+	if err := db.TestConnection("mongodb", params); err != nil {
+		fmt.Println("❌ Connection failed:", err)
+	} else {
+		fmt.Println("✅ Connection successful!")
+	}
+	fmt.Print("\nPress ENTER to return...")
+	a.reader.ReadString('\n')
+	a.TestConnectionMenu()
+}
+
+func (a *App) TestSQLiteConnection() {
+	a.clearScreen()
+	a.showBanner()
+	dbPath := a.promptInput("Path to SQLite .db file", "./database.db", false)
+
+	params := map[string]string{"path": dbPath}
+	if err := db.TestConnection("sqlite", params); err != nil {
+		fmt.Println("❌ Connection failed:", err)
+	} else {
+		fmt.Println("✅ Connection successful!")
+	}
+	fmt.Print("\nPress ENTER to return...")
+	a.reader.ReadString('\n')
+	a.TestConnectionMenu()
+}
+
+func (a *App) ScheduleMenu() {
+	a.clearScreen()
+	a.showBanner()
+	fmt.Println("--- Backup Scheduler ---")
+	fmt.Println("[1] Add New Scheduled Backup")
+	fmt.Println("[2] View Scheduled Jobs")
+	fmt.Println("[0] Back to Main Menu")
+	fmt.Print("Enter choice: ")
+
+	switch a.readInt() {
+	case 1:
+		a.AddScheduledBackup()
+	case 2:
+		a.ViewScheduledJobs()
+	case 0:
+		a.MainMenu()
+	default:
+		fmt.Println("Invalid choice.")
+		a.ScheduleMenu()
+	}
+}
+
+func (a *App) AddScheduledBackup() {
+	a.clearScreen()
+	a.showBanner()
+	fmt.Println("Choose DB Type:")
+	fmt.Println("[1] MySQL")
+	fmt.Println("[2] PostgreSQL")
+	fmt.Println("[3] MongoDB")
+	fmt.Println("[4] SQLite")
+	fmt.Print("Select: ")
+
+	dbChoice := a.readInt()
+	var dbType string
+	params := make(map[string]string)
+
+	switch dbChoice {
+	case 1:
+		dbType = "mysql"
+		params["host"] = a.promptInput("Host", "localhost", false)
+		params["user"] = a.promptInput("User", "root", false)
+		params["pass"] = a.promptInput("Password", "", false)
+		params["dbname"] = a.promptInput("Database Name", "", false)
+		params["out"] = a.promptInput("Backup Dir", "./backups", false)
+	case 2:
+		dbType = "postgres"
+		params["host"] = a.promptInput("Host", "localhost", false)
+		params["port"] = a.promptInput("Port", "5432", false)
+		params["user"] = a.promptInput("User", "postgres", false)
+		params["pass"] = a.promptInput("Password", "", false)
+		params["dbname"] = a.promptInput("Database Name", "", false)
+		params["out"] = a.promptInput("Backup Dir", "./backups", false)
+	case 3:
+		dbType = "mongodb"
+		params["uri"] = a.promptInput("Mongo URI", "mongodb://localhost:27017", false)
+		params["dbname"] = a.promptInput("Database Name", "", false)
+		params["out"] = a.promptInput("Backup Dir", "./backups", false)
+	case 4:
+		dbType = "sqlite"
+		params["path"] = a.promptInput("SQLite file path", "./database.db", false)
+		params["out"] = a.promptInput("Backup Dir", "./backups", false)
+	default:
+		fmt.Println("Invalid DB type.")
+		a.ScheduleMenu()
+		return
+	}
+
+	schedule := a.promptInput("Cron schedule (e.g. @daily, @hourly, */30 * * * *)", "@daily", false)
+
+	if err := scheduler.AddJob(dbType, schedule, params); err != nil {
+		fmt.Println("❌ Failed to schedule job:", err)
+	} else {
+		fmt.Println("✅ Backup job scheduled successfully!")
+	}
+
+	fmt.Print("\nPress ENTER to return...")
+	a.reader.ReadString('\n')
+	a.ScheduleMenu()
+}
+
+func (a *App) ViewScheduledJobs() {
+	a.clearScreen()
+	a.showBanner()
+	jobs := scheduler.ListJobs()
+	if len(jobs) == 0 {
+		fmt.Println("⚠️ No scheduled jobs found.")
+	} else {
+		fmt.Println("--- Scheduled Jobs ---")
+		for _, j := range jobs {
+			fmt.Printf("[%s] %s @ %s → %v\n", j.CreatedAt.Format("2006-01-02 15:04"), j.DBType, j.Schedule, j.Params)
+		}
+	}
+	fmt.Print("\nPress ENTER to return...")
+	a.reader.ReadString('\n')
+	a.ScheduleMenu()
 }
