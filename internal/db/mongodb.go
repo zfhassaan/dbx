@@ -2,10 +2,13 @@ package db
 
 import (
 	"bufio"
+	"dbx/internal/logs"
+	"dbx/internal/notify"
 	"dbx/internal/utils"
 	"fmt"
 	"os"
 	"os/exec"
+	osuser "os/user"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -60,8 +63,36 @@ func BackupMongo(uri, dbName, outDir string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
+	start := time.Now()
 	fmt.Println("🔄 Running MongoDB backup...")
-	if err := cmd.Run(); err != nil {
+	err := cmd.Run()
+	
+	defer func() {
+		status := "SUCCESS"
+		if err != nil {
+			status = "FAILED"
+		}
+		logs.LogEntry("MongoDB", "Backup", status, start, err)
+		
+		// Send Slack notification if webhook is configured
+		if webhook := os.Getenv("SLACK_WEBHOOK"); webhook != "" {
+			duration := time.Since(start).Round(time.Second)
+			hostname, _ := os.Hostname()
+			username := "unknown"
+			if u, e := osuser.Current(); e == nil {
+				username = u.Username
+			}
+			
+			message := fmt.Sprintf("MongoDB Backup %s\nDatabase: %s\nDuration: %s\nHost: %s\nUser: %s", 
+				status, dbName, duration, hostname, username)
+			if err != nil {
+				message += fmt.Sprintf("\nError: %v", err)
+			}
+			_ = notify.SlackNotify(webhook, message)
+		}
+	}()
+	
+	if err != nil {
 		return fmt.Errorf("mongodump failed: %w", err)
 	}
 

@@ -1,38 +1,33 @@
 package cmd
 
 import (
-	"bufio"
 	"dbx/internal/db"
 	"fmt"
 	"os"
-	"strings"
+
+	"github.com/spf13/cobra"
 )
 
-func RunMongoBackup() {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Println("--- MongoDB Backup ---")
+var mongodbCmd = &cobra.Command{
+	Use:   "mongo",
+	Short: "Backup a MongoDB database",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		err := db.BackupMongo(uri, database, out)
+		if err != nil {
+			fmt.Println("Backup failed:", err)
+			os.Exit(1)
+		}
+		fmt.Println("✅ Backup complete")
+		return nil
+	},
+}
 
-	fmt.Print("MongoDB URI [mongodb://localhost:27017]: ")
-	uri, _ := reader.ReadString('\n')
-	uri = strings.TrimSpace(uri)
-	if uri == "" {
-		uri = "mongodb://localhost:27017"
-	}
+func init() {
+	backupCmd.AddCommand(mongodbCmd)
 
-	fmt.Print("Database Name: ")
-	dbName, _ := reader.ReadString('\n')
-	dbName = strings.TrimSpace(dbName)
+	mongodbCmd.Flags().StringVar(&uri, "uri", "mongodb://localhost:27017", "MongoDB URI")
+	mongodbCmd.Flags().StringVar(&database, "database", "", "Database name")
+	mongodbCmd.Flags().StringVar(&out, "out", "./backups", "Output directory")
 
-	fmt.Print("Backup Directory [./backups]: ")
-	out, _ := reader.ReadString('\n')
-	out = strings.TrimSpace(out)
-	if out == "" {
-		out = "./backups"
-	}
-
-	if err := db.BackupMongo(uri, dbName, out); err != nil {
-		fmt.Println("❌ Backup failed:", err)
-	} else {
-		fmt.Println("✅ Backup successful!")
-	}
+	mongodbCmd.MarkFlagRequired("database")
 }

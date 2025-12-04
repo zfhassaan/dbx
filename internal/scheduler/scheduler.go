@@ -51,6 +51,8 @@ func AddJob(dbType, schedule string, params map[string]string) error {
 			_ = db.BackupPostgres(params["host"], params["port"], params["user"], params["pass"], params["dbname"], params["out"])
 		case "mongodb":
 			_ = db.BackupMongo(params["uri"], params["dbname"], params["out"])
+		case "sqlite":
+			_ = db.BackupSQLite(params["path"], params["out"])
 		}
 		fmt.Printf("✅ %s backup completed in %s\n", dbType, time.Since(start).Round(time.Second))
 	})
@@ -71,14 +73,16 @@ func loadJobs() {
 	_ = json.Unmarshal(data, &jobs)
 	for _, job := range jobs {
 		_, _ = c.AddFunc(job.Schedule, func() {
-			switch job.DBType {
-			case "mysql":
-				_ = db.BackupMySQL(job.Params["host"], job.Params["user"], job.Params["pass"], job.Params["dbname"], job.Params["out"])
-			case "postgres":
-				_ = db.BackupPostgres(job.Params["host"], job.Params["port"], job.Params["user"], job.Params["pass"], job.Params["dbname"], job.Params["out"])
-			case "mongodb":
-				_ = db.BackupMongo(job.Params["uri"], job.Params["dbname"], job.Params["out"])
-			}
+		switch job.DBType {
+		case "mysql":
+			_ = db.BackupMySQL(job.Params["host"], job.Params["user"], job.Params["pass"], job.Params["dbname"], job.Params["out"])
+		case "postgres":
+			_ = db.BackupPostgres(job.Params["host"], job.Params["port"], job.Params["user"], job.Params["pass"], job.Params["dbname"], job.Params["out"])
+		case "mongodb":
+			_ = db.BackupMongo(job.Params["uri"], job.Params["dbname"], job.Params["out"])
+		case "sqlite":
+			_ = db.BackupSQLite(job.Params["path"], job.Params["out"])
+		}
 		})
 	}
 }

@@ -2,13 +2,13 @@ package main
 
 import (
 	"bufio"
-	"dbx/cmd"
 	"dbx/internal/cloud"
 	"dbx/internal/db"
 	"dbx/internal/scheduler"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -105,6 +105,8 @@ func (a *App) MainMenu() {
 		a.TestConnectionMenu()
 	case 5:
 		a.ScheduleMenu()
+	case 6:
+		a.CloudHelp()
 	case 0:
 		fmt.Println("👋 Exiting DBX.")
 		os.Exit(0)
@@ -146,13 +148,26 @@ func (a *App) CloudHelp() {
 	a.clearScreen()
 	a.showBanner()
 	fmt.Println("--- Cloud Storage Setup ---")
+	fmt.Println()
+	fmt.Println("🌐 AWS S3:")
 	fmt.Println("1️⃣ Install AWS CLI: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html")
 	fmt.Println("2️⃣ Run: aws configure")
 	fmt.Println("   Enter your Access Key, Secret, and Region.")
 	fmt.Println("3️⃣ DBX will use your default AWS profile automatically.")
-	fmt.Println("\n✅ Tip: You can set env vars DBX_S3_BUCKET & DBX_S3_PREFIX for auto-upload.")
+	fmt.Println()
+	fmt.Println("☁️ Google Cloud Storage (GCS):")
+	fmt.Println("1️⃣ Install gsutil: https://cloud.google.com/storage/docs/gsutil_install")
+	fmt.Println("2️⃣ Run: gcloud auth login")
+	fmt.Println("3️⃣ Configure your project: gcloud config set project YOUR_PROJECT_ID")
+	fmt.Println()
+	fmt.Println("🔷 Azure Blob Storage:")
+	fmt.Println("1️⃣ Install Azure CLI: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli")
+	fmt.Println("2️⃣ Run: az login")
+	fmt.Println("3️⃣ Set your storage account: az storage account show --name YOUR_ACCOUNT")
+	fmt.Println()
+	fmt.Println("✅ Tip: You can set env vars DBX_S3_BUCKET & DBX_S3_PREFIX for auto-upload.")
 	fmt.Print("\nPress ENTER to return...")
-	defer func() { _, _ = a.reader.ReadString('\n') }()
+	a.reader.ReadString('\n')
 	a.MainMenu()
 }
 
@@ -200,7 +215,9 @@ func (a *App) RestoreMenu() {
 	a.showBanner()
 	fmt.Println("--- Restore Menu ---")
 	fmt.Println("[1] Restore MySQL Backup")
-	fmt.Println("[2] Restore MongoDB Backup")
+	fmt.Println("[2] Restore PostgreSQL Backup")
+	fmt.Println("[3] Restore MongoDB Backup")
+	fmt.Println("[4] Restore SQLite Backup")
 	fmt.Println("[0] Back to Main Menu")
 	fmt.Print("Enter your choice: ")
 
@@ -208,7 +225,11 @@ func (a *App) RestoreMenu() {
 	case 1:
 		a.RunMySQLRestore()
 	case 2:
+		a.RunPostgresRestore()
+	case 3:
 		a.RunMongoRestore()
+	case 4:
+		a.RunSQLiteRestore()
 	case 0:
 		a.MainMenu()
 	default:
@@ -220,13 +241,39 @@ func (a *App) RestoreMenu() {
 func (a *App) RunMongoBackup() {
 	a.clearScreen()
 	a.showBanner()
-	cmd.RunMongoBackup()
+	uri := a.promptInput("MongoDB URI", "mongodb://localhost:27017", false)
+	dbname := a.promptInput("Database Name", "", false)
+	out := a.promptInput("Backup Directory", "./backups", false)
+
+	err := db.BackupMongo(uri, dbname, out)
+	if err != nil {
+		fmt.Println("\n❌ Backup failed:", err)
+	} else {
+		fmt.Println("\n✅ Backup successful!")
+	}
 
 	upload := a.promptInput("Upload to AWS S3? (y/N)", "N", false)
 	if strings.ToLower(upload) == "y" {
 		bucket := a.promptInput("S3 Bucket Name", "my-db-backups", false)
 		prefix := a.promptInput("S3 Prefix (folder path)", "dbx/", false)
-		if err := cloud.UploadToS3(out+".zip", bucket, prefix); err != nil {
+		// Find the backup file - MongoDB backups create a directory with timestamp, then zip it
+		// The zip file will be in the output directory with pattern: dbname_timestamp.zip
+		backupPattern := filepath.Join(out, dbname+"_*.zip")
+		matches, _ := filepath.Glob(backupPattern)
+		var backupFile string
+		if len(matches) > 0 {
+			backupFile = matches[len(matches)-1] // Use the most recent one
+		} else {
+			// Fallback: try to find any zip file in the output directory
+			allZips, _ := filepath.Glob(filepath.Join(out, "*.zip"))
+			if len(allZips) > 0 {
+				backupFile = allZips[len(allZips)-1]
+			} else {
+				fmt.Println("⚠️ No backup zip file found to upload")
+				return
+			}
+		}
+		if err := cloud.UploadToS3(backupFile, bucket, prefix); err != nil {
 			fmt.Println("❌ Upload failed:", err)
 		} else {
 			fmt.Println("☁️  Backup uploaded to S3 successfully!")
@@ -378,6 +425,27 @@ func (a *App) RunMySQLRestore() {
 	a.RestoreMenu()
 }
 
+func (a *App) RunPostgresRestore() {
+	a.clearScreen()
+	a.showBanner()
+	host := a.promptInput("PostgreSQL Host", "localhost", false)
+	port := a.promptInput("PostgreSQL Port", "5432", false)
+	user := a.promptInput("PostgreSQL User", "postgres", false)
+	pass := a.promptInput("PostgreSQL Password", "", false)
+	dbname := a.promptInput("Database Name", "", false)
+	file := a.promptInput("Path to backup file", "./backups/backup.dump", false)
+
+	if err := db.RestorePostgres(host, port, user, pass, dbname, file); err != nil {
+		fmt.Println("\n❌ Restore failed:", err)
+	} else {
+		fmt.Println("\n✅ Restore successful!")
+	}
+
+	fmt.Print("\nPress ENTER to return to Restore Menu...")
+	a.reader.ReadString('\n')
+	a.RestoreMenu()
+}
+
 func (a *App) RunMongoRestore() {
 	a.clearScreen()
 	a.showBanner()
@@ -386,6 +454,23 @@ func (a *App) RunMongoRestore() {
 	backupDir := a.promptInput("Path to backup folder", "./backups/dbname_timestamp", false)
 
 	if err := db.RestoreMongo(uri, dbname, backupDir); err != nil {
+		fmt.Println("\n❌ Restore failed:", err)
+	} else {
+		fmt.Println("\n✅ Restore successful!")
+	}
+
+	fmt.Print("\nPress ENTER to return to Restore Menu...")
+	a.reader.ReadString('\n')
+	a.RestoreMenu()
+}
+
+func (a *App) RunSQLiteRestore() {
+	a.clearScreen()
+	a.showBanner()
+	backupFile := a.promptInput("Path to backup file", "./backups/backup.db.zip", false)
+	targetPath := a.promptInput("Target database path (optional)", "", false)
+
+	if err := db.RestoreSQLite(backupFile, targetPath); err != nil {
 		fmt.Println("\n❌ Restore failed:", err)
 	} else {
 		fmt.Println("\n✅ Restore successful!")

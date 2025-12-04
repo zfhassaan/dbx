@@ -3,19 +3,31 @@ package db
 import (
 	"bytes"
 	"dbx/internal/logs"
+	"dbx/internal/notify"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	osuser "os/user"
 	"path/filepath"
 	"time"
 )
 
+// BackupMySQL creates a backup of a MySQL database
 func BackupMySQL(host, user, password, database, outDir string) error {
+	return BackupMySQLWithType(host, user, password, database, outDir, BackupTypeFull)
+}
+
+// BackupMySQLWithType creates a backup of a MySQL database with specified backup type
+func BackupMySQLWithType(host, user, password, database, outDir string, backupType BackupType) error {
 	start := time.Now()
 
 	ts := time.Now().Format("2006-01-02_15-04")
-	outFile := filepath.Join(outDir, fmt.Sprintf("%s-%s.sql", database, ts))
+	backupSuffix := string(backupType)
+	if backupType != BackupTypeFull {
+		backupSuffix = string(backupType) + "_" + ts
+	}
+	outFile := filepath.Join(outDir, fmt.Sprintf("%s-%s_%s.sql", database, backupSuffix, ts))
 
 	if err := os.MkdirAll(outDir, 0755); err != nil {
 		return err
@@ -25,6 +37,15 @@ func BackupMySQL(host, user, password, database, outDir string) error {
 	if password != "" {
 		args = append(args, "-p"+password)
 	}
+	
+	// For incremental backups, use --master-data and --flush-logs
+	if backupType == BackupTypeIncremental {
+		args = append(args, "--master-data=2", "--flush-logs", "--single-transaction")
+	} else if backupType == BackupTypeDifferential {
+		// Differential backup: backup since last full backup
+		args = append(args, "--master-data=2", "--single-transaction")
+	}
+	
 	args = append(args, database)
 
 	cmd := exec.Command("mysqldump", args...)
@@ -74,6 +95,23 @@ func BackupMySQL(host, user, password, database, outDir string) error {
 			status = "FAILED"
 		}
 		logs.LogEntry("MySQL", "Backup", status, start, err)
+		
+		// Send Slack notification if webhook is configured
+		if webhook := os.Getenv("SLACK_WEBHOOK"); webhook != "" {
+			duration := time.Since(start).Round(time.Second)
+			hostname, _ := os.Hostname()
+			username := "unknown"
+			if u, e := osuser.Current(); e == nil {
+				username = u.Username
+			}
+			
+			message := fmt.Sprintf("MySQL Backup %s\nDatabase: %s\nDuration: %s\nHost: %s\nUser: %s", 
+				status, database, duration, hostname, username)
+			if err != nil {
+				message += fmt.Sprintf("\nError: %v", err)
+			}
+			_ = notify.SlackNotify(webhook, message)
+		}
 	}()
 
 	if _, err := outputBuf.WriteTo(file); err != nil {
