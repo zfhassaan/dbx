@@ -5,7 +5,7 @@
 
 APP_NAME="dbx"
 BUILD_DIR="dist"
-VERSION="${VERSION:-1.0.0}"
+VERSION="${VERSION:-0.1.0}"
 LDFLAGS="-s -w -X main.version=${VERSION}"
 
 echo "========================================"
