@@ -68,26 +68,32 @@ func AddJob(dbType, schedule string, params map[string]string) error {
 func loadJobs() {
 	data, err := os.ReadFile(configFile)
 	if err != nil {
+		// No existing schedule file - start with empty job list
 		return
 	}
+	// Ignore unmarshal errors - corrupted file will result in empty job list
 	_ = json.Unmarshal(data, &jobs)
 	for _, job := range jobs {
+		// Ignore AddFunc errors - invalid schedules will be skipped
+		// Capture loop variable by value to avoid closure capturing reference
+		job := job
 		_, _ = c.AddFunc(job.Schedule, func() {
-		switch job.DBType {
-		case "mysql":
-			_ = db.BackupMySQL(job.Params["host"], job.Params["user"], job.Params["pass"], job.Params["dbname"], job.Params["out"])
-		case "postgres":
-			_ = db.BackupPostgres(job.Params["host"], job.Params["port"], job.Params["user"], job.Params["pass"], job.Params["dbname"], job.Params["out"])
-		case "mongodb":
-			_ = db.BackupMongo(job.Params["uri"], job.Params["dbname"], job.Params["out"])
-		case "sqlite":
-			_ = db.BackupSQLite(job.Params["path"], job.Params["out"])
-		}
+			switch job.DBType {
+			case "mysql":
+				_ = db.BackupMySQL(job.Params["host"], job.Params["user"], job.Params["pass"], job.Params["dbname"], job.Params["out"])
+			case "postgres":
+				_ = db.BackupPostgres(job.Params["host"], job.Params["port"], job.Params["user"], job.Params["pass"], job.Params["dbname"], job.Params["out"])
+			case "mongodb":
+				_ = db.BackupMongo(job.Params["uri"], job.Params["dbname"], job.Params["out"])
+			case "sqlite":
+				_ = db.BackupSQLite(job.Params["path"], job.Params["out"])
+			}
 		})
 	}
 }
 
 func saveJobs() error {
+	// MarshalIndent should never fail with valid job data, but handle via WriteFile error if it does
 	data, _ := json.MarshalIndent(jobs, "", "  ")
 	return os.WriteFile(configFile, data, 0644)
 }

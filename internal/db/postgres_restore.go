@@ -16,7 +16,12 @@ func RestorePostgres(host, port, user, pass, dbName, backupFile string) error {
 		return fmt.Errorf("pg_restore not found in PATH")
 	}
 
-	defer func() { _ = os.Setenv("PGPASSWORD", pass) }()
+	// Set env for passwordless execution - must be set BEFORE cmd.Run()
+	if pass != "" {
+		os.Setenv("PGPASSWORD", pass)
+	} else {
+		os.Unsetenv("PGPASSWORD")
+	}
 
 	cmd := exec.Command("pg_restore",
 		"-h", host,
@@ -54,7 +59,12 @@ func RestorePostgresTable(host, port, user, pass, dbName, backupFile, tableName 
 		return fmt.Errorf("pg_restore not found in PATH")
 	}
 
-	defer func() { _ = os.Setenv("PGPASSWORD", pass) }()
+	// Set env for passwordless execution - must be set BEFORE cmd.Run()
+	if pass != "" {
+		os.Setenv("PGPASSWORD", pass)
+	} else {
+		os.Unsetenv("PGPASSWORD")
+	}
 
 	cmd := exec.Command("pg_restore",
 		"-h", host,

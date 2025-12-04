@@ -1,0 +1,4 @@
+#!/bin/bash
+# Simple coverage command - use this to check test coverage
+go run scripts/coverage.go
+

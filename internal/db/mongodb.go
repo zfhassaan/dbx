@@ -96,11 +96,14 @@ func BackupMongo(uri, dbName, outDir string) error {
 		return fmt.Errorf("mongodump failed: %w", err)
 	}
 
+	// Compression is optional - backup directory exists even if compression fails
 	zipPath := outPath + ".zip"
 	if err := utils.CompressFolder(outPath, zipPath); err == nil {
+		// Remove uncompressed directory after successful compression
 		defer func() { _ = os.RemoveAll(outPath) }()
 		fmt.Println("🗜 Compressed to:", zipPath)
 	} else {
+		// Compression failed - keep uncompressed backup directory
 		fmt.Println("⚠️ Compression failed:", err)
 	}
 
@@ -128,12 +131,15 @@ func installMongoTools() error {
 			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 			return cmd.Run()
 		}
+		// If neither apt nor yum is available, fall through to unsupported OS error
 	case "darwin":
 		fmt.Println("📦 Installing via Homebrew (macOS)...")
 		cmd := exec.Command("brew", "install", "mongodb-database-tools")
 		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 		return cmd.Run()
 	case "windows":
+		// Windows auto-install not supported - user must manually install
+		// Open browser to download page as a convenience
 		fmt.Println("⚠️ Windows auto-install is not supported.")
 		fmt.Println("Opening MongoDB Tools download page...")
 		_ = exec.Command("rundll32", "url.dll,FileProtocolHandler",
@@ -178,6 +184,7 @@ func RunMongobackup() {
 	fmt.Println("--- MongoDB Backup ---")
 
 	fmt.Print("MongoDB URI [mongodb://localhost:27017]: ")
+	// Ignore ReadString errors - empty input is handled with defaults
 	uri, _ := reader.ReadString('\n')
 	uri = strings.TrimSpace(uri)
 	if uri == "" {
@@ -185,10 +192,12 @@ func RunMongobackup() {
 	}
 
 	fmt.Print("Database Name: ")
+	// Ignore ReadString errors - will be validated by BackupMongo function
 	dbName, _ := reader.ReadString('\n')
 	dbName = strings.TrimSpace(dbName)
 
 	fmt.Print("Backup Directory [./backups]: ")
+	// Ignore ReadString errors - empty input uses default directory
 	out, _ := reader.ReadString('\n')
 	out = strings.TrimSpace(out)
 	if out == "" {

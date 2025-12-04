@@ -1,0 +1,4 @@
+#!/bin/bash
+# Simple test runner - use this single command to run all tests
+go run scripts/run_tests.go
+

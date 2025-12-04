@@ -10,12 +10,13 @@ import (
 
 // UploadToS3 uploads the given file/folder to AWS S3 using the AWS CLI.
 func UploadToS3(localPath, bucket, prefix string) error {
-	if _, err := exec.LookPath("aws"); err != nil {
-		return errors.New("aws CLI not found in PATH — install it first: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html")
-	}
-
+	// Validate bucket name first (before checking AWS CLI)
 	if bucket == "" {
 		return errors.New("S3 bucket name required")
+	}
+
+	if _, err := exec.LookPath("aws"); err != nil {
+		return errors.New("aws CLI not found in PATH — install it first: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html")
 	}
 
 	key := filepath.Join(prefix, filepath.Base(localPath))

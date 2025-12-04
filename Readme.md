@@ -67,11 +67,57 @@ dbx/
 
 ## ⚙️ Installation
 
+### Option 1: Build from Source
+
+**On Windows:**
 ```bash
 git clone https://github.com/zfhassaan/dbx.git
 cd dbx
-go build -o dbx
-````
+go build -o dbx.exe main.go
+```
+
+**On Linux/Mac:**
+```bash
+git clone https://github.com/zfhassaan/dbx.git
+cd dbx
+go build -o dbx main.go
+```
+
+### Option 2: Cross-Compile for Multiple Platforms
+
+**Using Makefile (Linux/Mac):**
+```bash
+make build-all          # Build for Windows and Linux
+make build-windows      # Build Windows executable only
+make build-linux        # Build Linux executable only
+```
+
+**Using Build Scripts:**
+
+**Windows:**
+```cmd
+build.bat
+```
+
+**Linux/Mac:**
+```bash
+chmod +x build.sh
+./build.sh
+```
+
+**Manual Cross-Compilation:**
+```bash
+# Windows executable
+GOOS=windows GOARCH=amd64 go build -o dist/dbx-windows-amd64.exe main.go
+
+# Linux executable
+GOOS=linux GOARCH=amd64 go build -o dist/dbx-linux-amd64 main.go
+
+# Linux ARM64 (for ARM servers)
+GOOS=linux GOARCH=arm64 go build -o dist/dbx-linux-arm64 main.go
+```
+
+All executables will be created in the `dist/` directory.
 
 ---
 

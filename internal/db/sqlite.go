@@ -54,13 +54,14 @@ func BackupSQLite(dbPath, outDir string) error {
 		return fmt.Errorf("failed to copy database: %w", err)
 	}
 
-	// Compress the backup
+	// Compress the backup (optional - uncompressed backup is still valid)
 	zipPath := outFile + ".zip"
 	if err := utils.CompressFile(outFile, zipPath); err == nil {
 		// Remove uncompressed file after successful compression
 		_ = os.Remove(outFile)
 		fmt.Println("🗜 Compressed to:", zipPath)
 	} else {
+		// Compression failed - keep uncompressed backup file
 		fmt.Println("⚠️ Compression failed, keeping uncompressed backup:", err)
 	}
 

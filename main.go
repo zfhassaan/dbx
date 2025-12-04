@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"golang.org/x/term"
 )
 
 type App struct {
@@ -35,6 +37,7 @@ func (a *App) clearScreen() {
 		cmd.Stdout = os.Stdout
 		err := cmd.Run()
 		if err != nil {
+			// Silently ignore clear screen errors - not critical for functionality
 			return
 		}
 	default:
@@ -42,6 +45,7 @@ func (a *App) clearScreen() {
 		cmd.Stdout = os.Stdout
 		err := cmd.Run()
 		if err != nil {
+			// Silently ignore clear screen errors - not critical for functionality
 			return
 		}
 	}
@@ -67,10 +71,26 @@ func (a *App) promptInput(prompt, defaultVal string, hideInput bool) string {
 	} else {
 		fmt.Printf("%s: ", prompt)
 	}
+
+	var input string
 	if hideInput {
-		// For simplicity, we use normal input; for real password hiding, use a library.
+		// Use terminal password input (hides characters as user types)
+		// Works cross-platform: Windows, Linux, macOS
+		fd := int(os.Stdin.Fd())
+		bytePassword, err := term.ReadPassword(fd)
+		if err != nil {
+			// Fallback to normal input if password reading fails
+			fmt.Println("\n⚠️ Warning: Could not hide input, using normal input mode")
+			input, _ = a.reader.ReadString('\n')
+		} else {
+			input = string(bytePassword)
+			fmt.Println() // Add newline after hidden input
+		}
+	} else {
+		// Ignore ReadString error - input will be empty string on error, which is handled below
+		input, _ = a.reader.ReadString('\n')
 	}
-	input, _ := a.reader.ReadString('\n')
+
 	input = strings.TrimSpace(input)
 	if input == "" && defaultVal != "" {
 		return defaultVal
@@ -281,7 +301,11 @@ func (a *App) RunMongoBackup() {
 	}
 
 	fmt.Print("\nPress ENTER to return to Backup Menu...")
+	// Ignore ReadString error - always return to menu regardless
 	if _, err := a.reader.ReadString('\n'); err == nil {
+		a.BackupMenu()
+	} else {
+		// Even if read fails, return to menu
 		a.BackupMenu()
 	}
 }
@@ -313,6 +337,7 @@ func (a *App) ViewLogs() {
 	}
 
 	fmt.Print("\nPress ENTER to return to Main Menu...")
+	// Ignore ReadString error - always return to menu
 	a.reader.ReadString('\n')
 	a.MainMenu()
 }
@@ -322,7 +347,7 @@ func (a *App) RunMySQLBackup() {
 	a.showBanner()
 	host := a.promptInput("MySQL Host", "localhost", false)
 	user := a.promptInput("MySQL User", "root", false)
-	pass := a.promptInput("MySQL Password", "", false)
+	pass := a.promptInput("MySQL Password", "", true)
 	dbname := a.promptInput("Database Name", "", false)
 	out := a.promptInput("Backup Directory", "./backups", false)
 
@@ -345,9 +370,10 @@ func (a *App) RunMySQLBackup() {
 	}
 
 	fmt.Print("\nPress ENTER to return to Backup Menu...")
+	// Ignore ReadString error - always return to menu
 	_, err = a.reader.ReadString('\n')
 	if err != nil {
-		return
+		// Input error is non-critical, continue to menu
 	}
 	a.BackupMenu()
 }
@@ -360,8 +386,10 @@ func (a *App) readInt() int {
 			break
 		}
 		// If input is not an int, clear the buffer and prompt again
+		// Ignore ReadString error - return 0 to indicate invalid input
 		_, err = a.reader.ReadString('\n')
 		if err != nil {
+			// If buffer clear fails, return 0 to indicate invalid input
 			return 0
 		}
 		fmt.Print("Please enter a valid number: ")
@@ -375,7 +403,7 @@ func (a *App) RunPostgresBackup() {
 	host := a.promptInput("PostgreSQL Host", "localhost", false)
 	port := a.promptInput("PostgreSQL Port", "5432", false)
 	user := a.promptInput("PostgreSQL User", "postgres", false)
-	pass := a.promptInput("PostgreSQL Password", "", false)
+	pass := a.promptInput("PostgreSQL Password", "", true)
 	dbname := a.promptInput("Database Name", "", false)
 	out := a.promptInput("Backup Directory", "./backups", false)
 
@@ -398,9 +426,10 @@ func (a *App) RunPostgresBackup() {
 	}
 
 	fmt.Print("\nPress ENTER to return to Backup Menu...")
+	// Ignore ReadString error - always return to menu
 	_, err = a.reader.ReadString('\n')
 	if err != nil {
-		return
+		// Input error is non-critical, continue to menu
 	}
 	a.BackupMenu()
 }
@@ -410,7 +439,7 @@ func (a *App) RunMySQLRestore() {
 	a.showBanner()
 	host := a.promptInput("MySQL Host", "localhost", false)
 	user := a.promptInput("MySQL User", "root", false)
-	pass := a.promptInput("MySQL Password", "", false)
+	pass := a.promptInput("MySQL Password", "", true)
 	dbname := a.promptInput("Database Name", "", false)
 	file := a.promptInput("Path to .sql backup file", "./backups/backup.sql", false)
 
@@ -421,6 +450,7 @@ func (a *App) RunMySQLRestore() {
 	}
 
 	fmt.Print("\nPress ENTER to return to Restore Menu...")
+	// Ignore ReadString error - always return to menu
 	a.reader.ReadString('\n')
 	a.RestoreMenu()
 }
@@ -431,7 +461,7 @@ func (a *App) RunPostgresRestore() {
 	host := a.promptInput("PostgreSQL Host", "localhost", false)
 	port := a.promptInput("PostgreSQL Port", "5432", false)
 	user := a.promptInput("PostgreSQL User", "postgres", false)
-	pass := a.promptInput("PostgreSQL Password", "", false)
+	pass := a.promptInput("PostgreSQL Password", "", true)
 	dbname := a.promptInput("Database Name", "", false)
 	file := a.promptInput("Path to backup file", "./backups/backup.dump", false)
 
@@ -442,6 +472,7 @@ func (a *App) RunPostgresRestore() {
 	}
 
 	fmt.Print("\nPress ENTER to return to Restore Menu...")
+	// Ignore ReadString error - always return to menu
 	a.reader.ReadString('\n')
 	a.RestoreMenu()
 }
@@ -460,6 +491,7 @@ func (a *App) RunMongoRestore() {
 	}
 
 	fmt.Print("\nPress ENTER to return to Restore Menu...")
+	// Ignore ReadString error - always return to menu
 	a.reader.ReadString('\n')
 	a.RestoreMenu()
 }
@@ -477,6 +509,7 @@ func (a *App) RunSQLiteRestore() {
 	}
 
 	fmt.Print("\nPress ENTER to return to Restore Menu...")
+	// Ignore ReadString error - always return to menu
 	a.reader.ReadString('\n')
 	a.RestoreMenu()
 }
@@ -486,7 +519,7 @@ func (a *App) TestMySQLConnection() {
 	a.showBanner()
 	host := a.promptInput("MySQL Host", "localhost", false)
 	user := a.promptInput("MySQL User", "root", false)
-	pass := a.promptInput("MySQL Password", "", false)
+	pass := a.promptInput("MySQL Password", "", true)
 	dbname := a.promptInput("Database Name", "", false)
 
 	params := map[string]string{"host": host, "user": user, "pass": pass, "dbname": dbname}
@@ -496,10 +529,10 @@ func (a *App) TestMySQLConnection() {
 		fmt.Println("✅ Connection successful!")
 	}
 	fmt.Print("\nPress ENTER to return...")
+	// Ignore ReadString error - always return to menu
 	_, err := a.reader.ReadString('\n')
 	if err != nil {
-		fmt.Println("Error in Connection", err)
-		return
+		// Input error is non-critical, continue to menu
 	}
 	a.TestConnectionMenu()
 }
@@ -510,7 +543,7 @@ func (a *App) TestPostgresConnection() {
 	host := a.promptInput("PostgreSQL Host", "localhost", false)
 	port := a.promptInput("PostgreSQL Port", "5432", false)
 	user := a.promptInput("PostgreSQL User", "postgres", false)
-	pass := a.promptInput("PostgreSQL Password", "", false)
+	pass := a.promptInput("PostgreSQL Password", "", true)
 	dbname := a.promptInput("Database Name", "", false)
 
 	params := map[string]string{"host": host, "port": port, "user": user, "pass": pass, "dbname": dbname}
@@ -520,9 +553,10 @@ func (a *App) TestPostgresConnection() {
 		fmt.Println("✅ Connection successful!")
 	}
 	fmt.Print("\nPress ENTER to return...")
+	// Ignore ReadString error - always return to menu
 	_, err := a.reader.ReadString('\n')
 	if err != nil {
-		return
+		// Input error is non-critical, continue to menu
 	}
 	a.TestConnectionMenu()
 }
@@ -539,6 +573,7 @@ func (a *App) TestMongoConnection() {
 		fmt.Println("✅ Connection successful!")
 	}
 	fmt.Print("\nPress ENTER to return...")
+	// Ignore ReadString error - always return to menu
 	a.reader.ReadString('\n')
 	a.TestConnectionMenu()
 }
@@ -555,6 +590,7 @@ func (a *App) TestSQLiteConnection() {
 		fmt.Println("✅ Connection successful!")
 	}
 	fmt.Print("\nPress ENTER to return...")
+	// Ignore ReadString error - always return to menu
 	a.reader.ReadString('\n')
 	a.TestConnectionMenu()
 }
@@ -600,7 +636,7 @@ func (a *App) AddScheduledBackup() {
 		dbType = "mysql"
 		params["host"] = a.promptInput("Host", "localhost", false)
 		params["user"] = a.promptInput("User", "root", false)
-		params["pass"] = a.promptInput("Password", "", false)
+		params["pass"] = a.promptInput("Password", "", true)
 		params["dbname"] = a.promptInput("Database Name", "", false)
 		params["out"] = a.promptInput("Backup Dir", "./backups", false)
 	case 2:
@@ -608,7 +644,7 @@ func (a *App) AddScheduledBackup() {
 		params["host"] = a.promptInput("Host", "localhost", false)
 		params["port"] = a.promptInput("Port", "5432", false)
 		params["user"] = a.promptInput("User", "postgres", false)
-		params["pass"] = a.promptInput("Password", "", false)
+		params["pass"] = a.promptInput("Password", "", true)
 		params["dbname"] = a.promptInput("Database Name", "", false)
 		params["out"] = a.promptInput("Backup Dir", "./backups", false)
 	case 3:
@@ -635,6 +671,7 @@ func (a *App) AddScheduledBackup() {
 	}
 
 	fmt.Print("\nPress ENTER to return...")
+	// Ignore ReadString error - always return to menu
 	a.reader.ReadString('\n')
 	a.ScheduleMenu()
 }
@@ -652,6 +689,7 @@ func (a *App) ViewScheduledJobs() {
 		}
 	}
 	fmt.Print("\nPress ENTER to return...")
+	// Ignore ReadString error - always return to menu
 	a.reader.ReadString('\n')
 	a.ScheduleMenu()
 }
