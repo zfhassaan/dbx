@@ -76,7 +76,7 @@ jobs:
         fail_ci_if_error: false
 
     - name: Report test failures
-      if: failure() && steps.tests.outputs.tests_passed == 'false'
+      if: failure() && steps.tests.outcome == 'failure'
       run: |
         echo "::error::❌ Test suite failed! Please review the test output above."
         echo "::error::All tests must pass before this PR can be merged."
@@ -89,5 +89,4 @@ jobs:
         echo "2. Fix any failing tests" >> $GITHUB_STEP_SUMMARY
         echo "3. Ensure all tests pass locally before pushing" >> $GITHUB_STEP_SUMMARY
         echo "4. Re-run the workflow after fixing the issues" >> $GITHUB_STEP_SUMMARY
-        exit 1
 
